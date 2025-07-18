@@ -1,0 +1,246 @@
+EVALUATE
+VAR ViewColumnsInfo = 
+    SELECTCOLUMNS(
+        FILTER( INFO.VIEW.COLUMNS(), [IsHidden] = FALSE() ),
+        "TableID", [ID],
+        "ColumnName", [Name],
+        "TableName", [table]
+    )
+
+ VAR PartitionInfo =
+     SELECTCOLUMNS(
+            FILTER(
+        INFO.PARTITIONS(),
+        [ModifiedTime] >= (NOW() - 30)
+    ),
+        "TableID", [TableID]
+    )
+VAR InfoColumnsInfo = 
+    SELECTCOLUMNS(
+            FILTER(
+        INFO.COLUMNS(),
+        [ModifiedTime] >= (NOW() - 30) || [TableID] in PartitionInfo
+    ),
+        "Table", [TableID],
+        "ID", [ID],
+        "ModifiedTime", [ModifiedTime],
+        "StructureModifiedTime", [StructureModifiedTime],
+        "RefreshedTime", [RefreshedTime],
+        "SourceColumn", [SourceColumn],
+        "Expression", [Expression]
+    )
+VAR ViewTablesInfo = 
+    SELECTCOLUMNS(
+        FILTER( INFO.VIEW.TABLES(), [IsHidden] = FALSE() ),
+        "ID", [ID],
+        "TableName", [Name]
+    )
+VAR QueryDefinition = 
+    FILTER(
+ADDCOLUMNS(        SELECTCOLUMNS( INFO.PARTITIONS(), "TableID", [TableID], "QueryDefinition", [QueryDefinition], "ModifiedTime", [ModifiedTime] ),
+        "SourceType", 
+        IF(
+                CONTAINSSTRING([QueryDefinition], "PowerBI.Dataflows") ||CONTAINSSTRING([QueryDefinition], "PowerPlatform.Dataflows") , "Dataflow",
+                IF(
+                    CONTAINSSTRING([QueryDefinition], "Query") , "SQL Query",
+                    IF(
+                     CONTAINSSTRING([QueryDefinition],"Sql.Database"), "SQL",                    
+                        IF(
+                            CONTAINSSTRING([QueryDefinition], "Excel.Workbook") && CONTAINSSTRING([QueryDefinition], "Web.Contents"), "Sharepoint",
+							IF(
+								CONTAINSSTRING([QueryDefinition], "Excel.Workbook") && CONTAINSSTRING([QueryDefinition], "File.Contents"), "Local File Excel",
+                            IF(
+                                CONTAINSSTRING([QueryDefinition], "Calendar"), "DateTable",
+                                IF( CONTAINSSTRING([QueryDefinition], "Table.FromRows"), "Enter Data", "Other"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+			),
+
+
+        "SQL Query",
+			COALESCE(IF(
+				CONTAINSSTRING([QueryDefinition],"Sql.Database") && CONTAINSSTRING([QueryDefinition], "Query=") || CONTAINSSTRING([QueryDefinition],"Sql.Database") && CONTAINSSTRING([QueryDefinition], "[Query")  ,
+				MID(
+					[QueryDefinition],
+					SEARCH("Query", [QueryDefinition]) + 7,
+					SEARCH("])", [QueryDefinition], SEARCH("Query", [QueryDefinition]) + 7)
+						- (SEARCH("Query", [QueryDefinition]) + 7)
+				),
+				BLANK()
+			),BLANK()),
+        "DataflowID",
+             IF(
+                CONTAINSSTRING([QueryDefinition], "dataflowId="),
+                MID(
+                    [QueryDefinition],
+                    SEARCH("dataflowId=""", [QueryDefinition]) + 12,
+                    36
+                ),
+                IF(
+                    CONTAINSSTRING([QueryDefinition], "[dataflowId="),
+                    MID(
+                        [QueryDefinition],
+                        SEARCH("[dataflowId=""", [QueryDefinition]) + 12,
+                        36
+                    ),
+                    ""
+                )
+        ),
+       "WorkspaceID",
+            IF(
+            CONTAINSSTRING([QueryDefinition], "workspaceId="),
+            MID(
+                [QueryDefinition],
+                SEARCH("workspaceId=""", [QueryDefinition]) + 13,
+                36
+            ),
+            IF(
+                CONTAINSSTRING([QueryDefinition], "[workspaceId="),
+                MID(
+                    [QueryDefinition],
+                    SEARCH("[workspaceId=""", [QueryDefinition]) + 13,
+                    36
+                ),
+                ""
+            )
+        ),
+        "ServerName",
+            VAR SqlPos1 = SEARCH("Sql.Database(""", [QueryDefinition], 1, -1)
+            VAR SqlPos2 = SEARCH("Sql.Databases(""", [QueryDefinition], 1, -1)
+            VAR EndPos1 = SEARCH("""", [QueryDefinition], SqlPos1 + 15, -1)
+            VAR EndPos2 = SEARCH("""", [QueryDefinition], SqlPos2 + 16, -1)
+            RETURN
+                IF(
+                    SqlPos1 > 0 && EndPos1 > 0,
+                    MID([QueryDefinition], SqlPos1 + 14, EndPos1 - (SqlPos1 + 14)),
+                    IF(
+                        SqlPos2 > 0 && EndPos2 > 0,
+                        MID([QueryDefinition], SqlPos2 + 15, EndPos2 - (SqlPos2 + 15))
+                        
+                    )
+                ),
+        "DatabaseName",
+            VAR QueryText = [QueryDefinition]
+            VAR SqlDbPos = SEARCH("Sql.Database(""", QueryText, 1, -1)
+            VAR FirstParamEndPos = IF(SqlDbPos > 0, SEARCH("""", QueryText, SqlDbPos + 15, -1), -1)
+            VAR SecondParamStartPos = IF(FirstParamEndPos > 0, SEARCH("""", QueryText, FirstParamEndPos + 1, -1), -1)
+            VAR SecondParamEndPos = IF(SecondParamStartPos > 0, SEARCH("""", QueryText, SecondParamStartPos + 1, -1), -1)
+            VAR DbNameFromSqlDb = IF(SecondParamStartPos > 0 && SecondParamEndPos > 0, MID(QueryText, SecondParamStartPos + 1, SecondParamEndPos - (SecondParamStartPos + 1)), BLANK())
+            VAR SqlDbsPos = SEARCH("Sql.Databases(""", QueryText, 1, -1)
+            VAR DbsNamePos = IF(SqlDbsPos > 0, SEARCH("{[Name=""", QueryText, SqlDbsPos + 16, -1), -1)
+            VAR DbsNameEndPos = IF(DbsNamePos > 0, SEARCH("""", QueryText, DbsNamePos + 8, -1), -1)
+            VAR DbNameFromSqlDbs = IF(DbsNamePos > 0 && DbsNameEndPos > 0, MID(QueryText, DbsNamePos + 8, DbsNameEndPos - (DbsNamePos + 8)), BLANK())
+            VAR FromPos = SEARCH("FROM [", UPPER(QueryText), 1, -1)
+            VAR FromDbEndPos = IF(FromPos > 0, SEARCH("].", UPPER(QueryText), FromPos + 6, -1), -1)
+            VAR DbNameFromQuery = IF(FromPos > 0 && FromDbEndPos > 0, MID(QueryText, FromPos + 6, FromDbEndPos - (FromPos + 6)), BLANK())
+            RETURN
+                IF(
+                    NOT ISBLANK(DbNameFromSqlDb), DbNameFromSqlDb,
+                    IF(
+                        NOT ISBLANK(DbNameFromSqlDbs), DbNameFromSqlDbs,
+                        IF(
+                            NOT ISBLANK(DbNameFromQuery), DbNameFromQuery
+                            
+                        )
+                    )
+                ),
+        "DBTableName",
+        IF(
+            CONTAINSSTRING([QueryDefinition], "Item="""),
+            MID(
+            [QueryDefinition],
+            SEARCH("Item=""", [QueryDefinition]) + 6,
+            SEARCH("""", [QueryDefinition], SEARCH("Item=""", [QueryDefinition]) + 6)
+                - (SEARCH("Item=""", [QueryDefinition]) + 6)
+        )
+        ),
+        "Schema",
+        IF(
+            CONTAINSSTRING([QueryDefinition], "Sql.Database") || CONTAINSSTRING([QueryDefinition], "Sql.Databases"),
+            // Schema is usually found as [Schema="XYZ"]
+            IF(
+                CONTAINSSTRING([QueryDefinition], "[Schema="),
+                MID(
+                    [QueryDefinition],
+                    SEARCH("[Schema=""", [QueryDefinition]) + 9,
+                    SEARCH("""", [QueryDefinition], SEARCH("[Schema=""", [QueryDefinition]) + 9) 
+                        - (SEARCH("[Schema=""", [QueryDefinition]) + 9)
+                )
+            )
+        ),
+        "SharepointURL",
+            VAR QueryText = [QueryDefinition]
+            VAR WebContentsPos = SEARCH("Web.Contents(""", QueryText, 1, -1)
+            VAR UrlPos1 = IF(WebContentsPos > 0, SEARCH("""", QueryText, WebContentsPos + 12, -1), -1)
+            VAR UrlPos2 = IF(UrlPos1 > 0, SEARCH("""", QueryText, UrlPos1 + 1, -1), -1)
+            RETURN
+                IF(
+                    WebContentsPos > 0 && UrlPos1 > 0 && UrlPos2 > 0,
+                    MID(QueryText, UrlPos1 + 1, UrlPos2 - (UrlPos1 + 1)),
+                    ""
+                )
+    ), [ModifiedTime] >= NOW() -30 )
+VAR Merged = 
+    SELECTCOLUMNS(
+        FILTER(
+            CROSSJOIN(ViewTablesInfo, QueryDefinition),
+            [ID] = [TableID]
+        ),
+        "ID", [ID],
+        "TableNameNew", [TableName],
+        "QueryDefinition", [QueryDefinition],
+        "SourceType", [SourceType],
+        "DBTableName",[DBTableName],
+        "Schema",[Schema],
+		"SQL Query",[SQL Query],
+        "DataflowID", [DataflowID],
+        "WorkspaceID", [WorkspaceID],
+        "ServerName", [ServerName],
+        "DatabaseName", [DatabaseName],
+        "SharepointURL", [SharepointURL]
+    )
+VAR Merged_2 = 
+    SELECTCOLUMNS(
+        FILTER(
+            CROSSJOIN(ViewColumnsInfo, InfoColumnsInfo),
+            [TableID] = [ID]
+        ),
+        "TableNameOld", [TableName],
+        "ColumnName", [ColumnName],
+        "TableID", [Table],
+        "ColumnID", [ID],
+        "ModifiedTime", [ModifiedTime],
+        "StructureModifiedTime", [StructureModifiedTime],
+        "RefreshedTime", [RefreshedTime],
+        "SourceColumn", [SourceColumn],
+        "Expression", [Expression]
+    )
+RETURN
+DISTINCT( SELECTCOLUMNS(
+        FILTER(
+            CROSSJOIN(Merged, Merged_2),
+            [ID] = [TableID]
+        ),
+        "TableName", [TableNameNew],
+        // "ColumnName", [ColumnName],
+        // "ModifiedTime", [ModifiedTime],
+        // "StructureModifiedTime", [StructureModifiedTime],
+        // "RefreshedTime", [RefreshedTime],
+        // "SourceColumn", IF.EAGER(ISBLANK([SourceColumn]),"Calculated Column",""),
+        // "Expression", [Expression],
+        "SourceType", [SourceType],
+        "SourceWorkspaceID", IF.EAGER([SourceType] = "Dataflow",[WorkspaceID]),
+        "SourceDataflowID", IF.EAGER([SourceType] = "Dataflow",[DataflowID]),
+        "DataflowURL",IF.EAGER([SourceType] = "Dataflow"  , "https://app.powerbi.com/groups/"&[WorkspaceID]&"/dataflows/"&[DataflowID]),
+        "ServerName", [ServerName],
+        "DatabaseName", [DatabaseName],
+        "DatabaseTableReference", IF.EAGER([SourceType] = "SQL" ,  [DatabaseName]&"."&[Schema]&"."&[DBTableName],IF.EAGER([SourceType] = "SQL Query",[SQL Query])),
+        "SharepointURL", IF.EAGER([SourceType] = "Sharepoint" , [SharepointURL])
+
+        
+    
+    ))
