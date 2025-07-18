@@ -27,3 +27,6 @@ It connects to the dataset using **DMV (Dynamic Management Views)** queries via 
 
 ```bash
 pip install -r requirements.txt
+
+<img width="795" height="415" alt="image" src="https://github.com/user-attachments/assets/f0538922-ea01-47e8-80ab-4b091bd6105f" />
+
