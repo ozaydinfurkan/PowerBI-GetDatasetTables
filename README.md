@@ -1,6 +1,6 @@
 # PowerBI-GetDatasetTables
 
-# 📊 Power BI Dataset Metadata Extractor (Python + XMLA)
+# 📊 Power BI Dataset Metadata Extractor (Python + XMLA + SQL)
 
 This project enables automatic extraction of **tables**, **columns**, and **data source information** from datasets hosted in a Power BI Premium or PPU workspace using the **XMLA Endpoint**.
 
