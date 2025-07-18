@@ -17,3 +17,13 @@ It connects to the dataset using **DMV (Dynamic Management Views)** queries via 
 ✅ Optionally writes metadata to SQL Server  
 
 ---
+
+## ⚙️ Requirements
+
+- Python 3.8+
+- Power BI Premium or Premium Per User (PPU) Workspace
+- Azure AD App Registration
+- Python libraries:
+
+```bash
+pip install -r requirements.txt
