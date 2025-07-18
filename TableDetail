@@ -24,7 +24,6 @@ load_dotenv(dotenv_path, override=True)
 CLIENT_ID     = os.getenv("CLIENT_ID")
 TENANT_ID     = os.getenv("TENANT_ID")
 WORKSPACE_ID  = os.getenv("MANUEL_WORKSPACE_ID")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET")
 WORKSPACE_NAME= os.getenv("MANUEL_WORKSPACE_NAME")
 
 server        = os.getenv("DB_SERVER")
