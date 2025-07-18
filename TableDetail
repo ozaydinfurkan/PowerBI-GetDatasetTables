@@ -10,12 +10,14 @@ import pyodbc
 import ssl
 
 # ─── ENVIRONMENT & .ENV LOAD ─────────────────────
+current_dir = Path(__file__).resolve().parent
+env_path = current_dir / ".env"
+if not env_path.exists():
+    env_path = current_dir.parent / ".env"
 
-dotenv_path = Path(__file__).resolve().parent.parent / ".env"
-print(f"Loading .env from: {dotenv_path}")
+print(f"Loading .env from: {env_path}")
+load_dotenv(dotenv_path=env_path)
 
-if not dotenv_path.exists():
-    sys.exit("❌ .env file not found.")
 
 load_dotenv(dotenv_path, override=True)
 # Env Variables
